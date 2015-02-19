@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import subprocess, argparse, os, time, shutil
 from tile_border_neighbours import TileBorderComputer
 from tile_colorencode import ColorEncoder
@@ -17,6 +17,7 @@ def parseArguments():
 	parser.add_argument('-a','--archive', help='Creates tar archive of tileset (default false).',required=False, action='store_true')	
 	parser.add_argument('-tf','--temp', help='Keep temporary files (default false).',required=False, action='store_true')	
 	parser.add_argument('-v','--verbose', help='Allow verbose console output (default false).',required=False, action='store_true')	
+	parser.add_argument('-z','--zoom', help='Comma seperated list of destination zoom levels.',required=False)	
 	return parser.parse_args()
 
 class ProcessControl():
@@ -67,6 +68,7 @@ def main():
 	mBuffer = args.buffer and args.buffer or 20
 	inputData = args.tileinput and args.tileinput or args.deminput
 	noData = args.dstnodata and args.dstnodata or -500
+	zoomLevels ='--zoom='+args.zoom
 
 	# set working directories
 	demName = os.path.split(inputData)[1]
@@ -87,7 +89,7 @@ def main():
 	print ("Input Dem: {input}\nWriting tiles to {output}\nProducing {tilescheme}-tiles. NoData Value is {nodata}.".format(input=inputData, output=tilesDestination, tilescheme=tileScheme, nodata=noData))
 	ps.printline()
 
-	if not args.tileinput: ps.execute("tiler-tools","Creating tiles (tif).","python {ttpath}/gdal_tiler.py --dst-nodata={nodata} -p {scheme} --tile-format='tif' --base-resampling='cubic' --overview-resampling='bilinear' {input} -t {output}".format(ttpath=tilertoolDir,input=inputData,output=tilesOutput,nodata=noData,scheme=tileScheme))
+	if not args.tileinput: ps.execute("tiler-tools","Creating tiles (tif).","python {ttpath}/gdal_tiler.py {zoom} --dst-nodata={nodata} -p {scheme} --tile-format='tif' --base-resampling='cubic' --overview-resampling='bilinear' {input} -t {output}".format(ttpath=tilertoolDir,input=inputData,output=tilesOutput,nodata=noData,scheme=tileScheme,zoom=zoomLevels))
  	ps.execute("tile_border_neighbours","Compute tile border values based on the neighbouring tiles (tif)",TileBorderComputer(tileScheme,tilesRaw,noData,multiThread,mThreads,mBuffer))
 	ps.execute("tile_colorencode","Encode elevation values and create final tiles (png)",ColorEncoder(tilesWithNeighbours,noData,multiThread,mThreads,mBuffer))
 
