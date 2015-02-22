@@ -112,8 +112,8 @@ class BaseImg(object):
 
         self.size = self.ds.RasterXSize, self.ds.RasterYSize
         self.bands = [self.ds.GetRasterBand(i+1) for i in range(self.ds.RasterCount-1)] # planoblique: avoid loading of second channel
-        stats = self.bands[0].GetStatistics(0, 1) # planoblique: avoid loading of second channel
-        print(stats) # planoblique: avoid loading of second channel
+        #stats = self.bands[0].GetStatistics(0, 1) # planoblique: avoid loading of second channel
+        #print(stats) # planoblique: avoid loading of second channel
     def __del__(self):
         del self.bands
         del self.ds
