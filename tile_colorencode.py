@@ -89,7 +89,7 @@ class EncoderCore:
                     self.out_ds.GetRasterBand(3).WriteArray(z, j, i)
 
                 elif self.in_band_1.DataType == 3: # GDT_Int16
-                    data = np.add(data, 11000)
+                    data = np.add(data, 5000)
                     self.out_ds.GetRasterBand(1).WriteArray(np.bitwise_and(data, 0xff), j, i)
                     self.out_ds.GetRasterBand(2).WriteArray(np.bitwise_and(np.right_shift(data, 8), 0xff), j, i)
                     self.out_ds.GetRasterBand(3).WriteArray(z, j, i)
@@ -107,7 +107,7 @@ class EncoderCore:
                 elif self.in_band_1.DataType == 6: # GDT_Float32
                     data = np.around(data,decimals=1)
                     data = np.multiply(data,10)
-                    data = np.add(data, 11000, dtype="int32")
+                    data = np.add(data, 5000, dtype="int32")
                     self.out_ds.GetRasterBand(1).WriteArray(np.bitwise_and(data, 0xff), j, i)
                     self.out_ds.GetRasterBand(2).WriteArray(np.bitwise_and(np.right_shift(data, 8), 0xff), j, i)
                     self.out_ds.GetRasterBand(3).WriteArray(z, j, i)
