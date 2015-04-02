@@ -27,7 +27,7 @@ class TileBorderCore:
     def openInputDataset(self, in_fn):
         self.in_ds = gdal.Open(in_fn, gdal.GA_Update)
 
-        # if file not exists exit
+        # skip if file does not exist
         if self.in_ds is None: 
             return -1
 
@@ -73,15 +73,15 @@ class TileBorderCore:
     def getNeighbourValues(self,in_neighbour):
         in_n_fn = os.path.join(in_neighbour[0],str(in_neighbour[1]))+'/'+str(in_neighbour[2])+'.tif'
        
+        format = "MEM"  
+        driver = gdal.GetDriverByName( format )
+
         # if file not exists exit
         if not os.path.isfile(in_n_fn):
-            return -1
-
-        in_n_ds = gdal.Open(in_n_fn, gdal.GA_ReadOnly)
-        
-        # if file is empty or corrupt
-        if in_n_ds is None: 
-            return -1
+            # empty raster with zeros 
+            in_n_ds = driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 2, gdal.GDT_Int16)
+        else:
+            in_n_ds = gdal.Open(in_n_fn, gdal.GA_ReadOnly)
 
         # read band 1 from input image
         in_n_ds_band_1 = in_n_ds.GetRasterBand(1)
@@ -91,82 +91,98 @@ class TileBorderCore:
 
         return data
 
-    def getToKnowTheNeighbours(self,corners,input_grid_copy,neighbourValues):
+    def getToKnowTheNeighbours(self,input_grid_copy,neighbourValues, output_band_2):
 
-        if( not corners):
-            # list has to be flattened to fit into stempel_data column
-            def flatten(*args):
-                for x in args:
-                    if hasattr(x, '__iter__'):
-                        for y in flatten(*x):
-                            yield y
-                    else:
-                        yield x
-          
-            # store original values of corners
-            self.nwCorner = input_grid_copy[0,0]
-            self.neCorner = input_grid_copy[0,255]
-            self.seCorner = input_grid_copy[255,255]
-            self.swCorner = input_grid_copy[255,0]     
+        # list has to be flattened to fit into stempel_data column
+        def flatten(*args):
+            for x in args:
+                if hasattr(x, '__iter__'):
+                    for y in flatten(*x):
+                        yield y
+                else:
+                    yield x
 
-            # numpy matrix: [row index, column index], : = all values
+        # numpy matrix: [row index, column index], : = all values
+      
 
-            # N
-            input_grid_copy[0,:] = neighbourValues[0] 
-            # S
-            input_grid_copy[255,:] = neighbourValues[1]
-            # E
-            input_grid_copy[:,255] = list(flatten(neighbourValues[2])) # list has to be flattened to fit into stempel_data column
-            # W
-            input_grid_copy[:,0] = list(flatten(neighbourValues[3])) # list has to be flattened to fit into stempel_data column
+        ##### STORE VALUES OF ADJACENT CORNERS IN NW NE SE SW
 
-        else:
+        self.nwCorner = input_grid_copy[0,0]
+        self.neCorner = input_grid_copy[0,255]
+        self.seCorner = input_grid_copy[255,255]
+        self.swCorner = input_grid_copy[255,0]     
 
-            # values in the corners of a tile have actually to be averaged with the help of every adjacent pixel
-            # if a neighbour exists overwrite corner with new mean value
+        ##### COPY ADJACENT ROWS TO INPUT GRID
 
-            if(neighbourValues[4] != -1):
-               # NW
-                input_grid_copy[0,0] = (neighbourValues[4][0][0] + neighbourValues[0][0][0] +  neighbourValues[3][0][0] + self.nwCorner) / 4.0
-            if(neighbourValues[5] != -1):      
-              # NE
-                input_grid_copy[0,255] = (neighbourValues[5][0][0] + neighbourValues[0][0][255] +  neighbourValues[2][0][0] + self.neCorner) / 4.0
-            if(neighbourValues[6] != -1):
-              # SE
-                input_grid_copy[255,255] = (neighbourValues[6][0][0] + neighbourValues[1][0][255] +  neighbourValues[2][255][0] + self.seCorner) / 4.0
-            if(neighbourValues[7] != -1):
-              # SW
-                input_grid_copy[255,0] = (neighbourValues[7][0][0] + neighbourValues[1][0][0] +  neighbourValues[3][255][0] + self.swCorner) / 4.0            
+        # N
+        input_grid_copy[0,:] = neighbourValues[0] 
+        # S
+        input_grid_copy[255,:] = neighbourValues[1]
+        # E
+        input_grid_copy[:,255] = list(flatten(neighbourValues[2])) # list has to be flattened to fit into stempel_data column
+        # W
+        input_grid_copy[:,0] = list(flatten(neighbourValues[3])) # list has to be flattened to fit into stempel_data column
 
+        ##### COPY ADJACENT ROWS TO BAND 2 FOR SHADING
+        #N
+        output_band_2[0,:] = neighbourValues[0]
+        #S
+        output_band_2[255,:] = neighbourValues[1]
+        #E
+        output_band_2[:,255] = list(flatten(neighbourValues[2]))
+        #W
+        output_band_2[:,0] = list(flatten(neighbourValues[3]))
+
+        ##### COMPUTE CORNER VALUES WITH ALL ADJACENT PIXEL VALUES
+
+        # is NW Corner Neighbour available ?
+        if(neighbourValues[4] != -1):
+            # NW
+            input_grid_copy[0,0] = (neighbourValues[4][0][0] + neighbourValues[0][0][0] +  neighbourValues[3][0][0] + self.nwCorner) / 4.0
+        
+        # is NE Corner Neighbour available ?           
+        if(neighbourValues[5] != -1):      
+            input_grid_copy[0,255] = (neighbourValues[5][0][0] + neighbourValues[0][0][255] +  neighbourValues[2][0][0] + self.neCorner) / 4.0
+        
+        # is SE Corner Neighbour available ?            
+        if(neighbourValues[6] != -1):
+            input_grid_copy[255,255] = (neighbourValues[6][0][0] + neighbourValues[1][0][255] +  neighbourValues[2][255][0] + self.seCorner) / 4.0
+       
+        # is SW Corner Neighbour available ?
+        if(neighbourValues[7] != -1):
+            input_grid_copy[255,0] = (neighbourValues[7][0][0] + neighbourValues[1][0][0] +  neighbourValues[3][255][0] + self.swCorner) / 4.0            
+       
 
     def createOutputDataset(self,in_neighbourValues):
         format = "MEM"  
         driver = gdal.GetDriverByName( format ) 
 
         # create output image as temporary MEM Buffer with same size as input
-        self.out_ds = driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 1, gdal.GDT_Float32)
+        self.out_ds = driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 2, gdal.GDT_Int16)
 
         # set Band Type (grey scale) and no data value
         self.out_ds.GetRasterBand(1).SetColorInterpretation(gdal.GCI_PaletteIndex)
         self.out_ds.GetRasterBand(1).SetNoDataValue(self.in_band_1.GetNoDataValue())
+        self.out_ds.GetRasterBand(2).SetColorInterpretation(gdal.GCI_PaletteIndex)
+        self.out_ds.GetRasterBand(2).SetNoDataValue(self.in_band_1.GetNoDataValue())
+
+        output_grid_band_2 = self.out_ds.GetRasterBand(2).ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize)
 
         # create matrix of input grid
         input_grid = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize)
 
-        # create masks to modify input grid               
-        input_grid_copy = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize) # copy needed because in_data is pointer
+        # create copy of input data; needed because in_data is pointer
+        input_grid_copy = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize) 
         
-        # copy values of borders and compute mean
-        self.getToKnowTheNeighbours(False,input_grid_copy,in_neighbourValues) 
+        # prepare stempel
+        self.getToKnowTheNeighbours(input_grid_copy,in_neighbourValues, output_grid_band_2) 
 
-        # computing mean of original raster grid and stempel_border_data for averaged border values
+        # computing mean of original raster grid and stempel for averaged border values
         input_grid=np.divide(np.add(input_grid,input_grid_copy),2.0)
-
-        # unfortunately this method has to be called a second time here because of a floating point issue (see getToKnowTheNeighbours())
-        self.getToKnowTheNeighbours(True,input_grid,in_neighbourValues) 
 
         # save to output dataset
         self.out_ds.GetRasterBand(1).WriteArray(input_grid)
+        self.out_ds.GetRasterBand(2).WriteArray(output_grid_band_2)
                     
 
     def exportToTif(self, ds, out_fn):
@@ -312,7 +328,7 @@ def main():
     noData = args.dstnodata
 
     mThreads = args.threads and args.threads or 8
-    mBuffer = args.buffer and args.buffer or 40
+    mBuffer = args.buffer and args.buffer or 160
     noData = args.dstnodata and args.dstnodata or -500
 
     print "Compute tile border values with help of their neighbours."

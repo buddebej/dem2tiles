@@ -89,7 +89,8 @@ def main():
 	print ("Input Dem: {input}\nWriting tiles to {output}\nProducing {tilescheme}-tiles. NoData Value is {nodata}.".format(input=inputData, output=tilesDestination, tilescheme=tileScheme, nodata=noData))
 	ps.printline()
 
-	if not args.tileinput: ps.execute("tiler-tools","Creating tiles (tif).","python {ttpath}/gdal_tiler.py {zoom} --dst-nodata={nodata} -p {scheme} --tile-format='tif' --base-resampling='cubic' --overview-resampling='bilinear' {input} -t {output}".format(ttpath=tilertoolDir,input=inputData,output=tilesOutput,nodata=noData,scheme=tileScheme,zoom=zoomLevels))
+
+	if not args.tileinput: ps.execute("tiler-tools","Creating tiles (tif).","python {ttpath}/gdal_tiler.py {zoom} --src-nodata=-500 --dst-nodata={nodata} --skip-invalid -p {scheme} --tile-format='tif' --base-resampling='bilinear' --overview-resampling='bilinear' {input} -t {output}".format(ttpath=tilertoolDir,input=inputData,output=tilesOutput,nodata=noData,scheme=tileScheme,zoom=zoomLevels))
  	ps.execute("tile_border_neighbours","Compute tile border values based on the neighbouring tiles (tif)",TileBorderComputer(tileScheme,tilesRaw,noData,multiThread,mThreads,mBuffer))
 	ps.execute("tile_colorencode","Encode elevation values and create final tiles (png)",ColorEncoder(tilesWithNeighbours,noData,multiThread,mThreads,mBuffer))
 

@@ -168,6 +168,8 @@ class Pyramid(object):
     zoom0_res = None
     max_extent = None
     max_resolution = None
+    tileCounter = 0
+    stepCounter = 0
 
     #----------------------------
 
@@ -720,12 +722,21 @@ class Pyramid(object):
     def proc_tile(self, tile):
 
     #----------------------------
+        def num2deg(xtile, ytile, zoom):
+            n = 2.0 ** zoom
+            lon_deg = xtile / n * 360.0 - 180.0
+            lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
+            lat_deg = math.degrees(lat_rad)
+            return (lat_deg, lon_deg)
 
         ch_opacities = []
         ch_results = []
         zoom, x, y = tile
         if zoom == self.max_zoom: # get from the base image
             src_tile = self.tile_map[tile]
+
+            # print(src_tile, num2deg(src_tile[1],src_tile[2],src_tile[0]))
+
             tile_img, opacity = self.base_img.get_tile(self.tile_pixbounds(src_tile))
             if tile_img and self.palette:
                 tile_img.putpalette(self.palette)
@@ -820,8 +831,22 @@ class Pyramid(object):
         if self.transparency is not None:
             tile_img.save(full_path, transparency=self.transparency)
         else:
-            tile_img.save(full_path)
+            if tile_img.getcolors():
+                # do not write empty base tiles
+                if len(tile_img.getcolors()) > 1:
+                    tile_img.save(full_path)
+                    self.tileCounter = self.tileCounter+1
+                    self.stepCounter = self.stepCounter+1
+            else:
+                # higher zoom levels
+                tile_img.save(full_path)
+                self.tileCounter = self.tileCounter+1
+                self.stepCounter = self.stepCounter+1
 
+            if self.stepCounter == 10000:
+                self.stepCounter = 0
+                print('\n'+str(self.tileCounter))
+                    
         self.progress()
 
     #----------------------------
@@ -838,6 +863,7 @@ class Pyramid(object):
 
     #----------------------------
         if tile is None:
+            print('Tiles processed: '+str(self.tileCounter))
             self.write_tilemap()
 
     #----------------------------
@@ -1095,7 +1121,7 @@ warp_vrt = '''<VRTDataset rasterXSize="%(xsize)d" rasterYSize="%(ysize)d" subCla
   <GDALWarpOptions>
     <!-- <WarpMemoryLimit>6.71089e+07</WarpMemoryLimit> -->
     <ResampleAlg>%(wo_ResampleAlg)s</ResampleAlg>
-    <WorkingDataType>Float32</WorkingDataType>
+    <WorkingDataType>Int16</WorkingDataType>
     <SourceDataset relativeToVRT="0">%(wo_src_path)s</SourceDataset>
 %(warp_options)s
     <Transformer>
@@ -1121,7 +1147,7 @@ warp_vrt = '''<VRTDataset rasterXSize="%(xsize)d" rasterYSize="%(ysize)d" subCla
 %(wo_DstAlphaBand)s%(wo_Cutline)s  </GDALWarpOptions>
 </VRTDataset>
 '''
-warp_band = '  <VRTRasterBand dataType="Float32" band="%d" subClass="VRTWarpedRasterBand"%s>'
+warp_band = '  <VRTRasterBand dataType="Int16" band="%d" subClass="VRTWarpedRasterBand"%s>'
 warp_band_color = '>\n    <ColorInterp>%s</ColorInterp>\n  </VRTRasterBand'
 warp_dst_alpha_band = '    <DstAlphaBand>%d</DstAlphaBand>\n'
 warp_cutline = '    <Cutline>%s</Cutline>\n'
@@ -1160,12 +1186,12 @@ gcp_templ = '    <GCP Id="%s" Pixel="%r" Line="%r" X="%r" Y="%r" Z="%r"/>'
 gcplst_templ = '  <GCPList Projection="%s">\n%s\n  </GCPList>\n'
 geotr_templ = '  <GeoTransform> %r, %r, %r, %r, %r, %r</GeoTransform>\n'
 meta_templ = '  <Metadata>\n%s\n  </Metadata>\n'
-band_templ = '''  <VRTRasterBand dataType="Float32" band="%(band)d">
+band_templ = '''  <VRTRasterBand dataType="Int16" band="%(band)d">
     <ColorInterp>%(color)s</ColorInterp>
     <ComplexSource>
       <SourceFilename relativeToVRT="0">%(src)s</SourceFilename>
       <SourceBand>%(srcband)d</SourceBand>
-      <SourceProperties RasterXSize="%(xsize)d" RasterYSize="%(ysize)d" DataType="Float32" BlockXSize="%(blxsize)d" BlockYSize="%(blysize)d"/>
+      <SourceProperties RasterXSize="%(xsize)d" RasterYSize="%(ysize)d" DataType="Int16" BlockXSize="%(blxsize)d" BlockYSize="%(blysize)d"/>
       <SrcRect xOff="0" yOff="0" xSize="%(xsize)d" ySize="%(ysize)d"/>
       <DstRect xOff="0" yOff="0" xSize="%(xsize)d" ySize="%(ysize)d"/>
       <ColorTableComponent>%(band)d</ColorTableComponent>
