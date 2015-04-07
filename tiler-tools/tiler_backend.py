@@ -564,6 +564,9 @@ class Pyramid(object):
             return '    <Option name="%s">%s</Option>' % (name, value)
 
         warp_options.append(w_option('INIT_DEST', 'NO_DATA'))
+        warp_options.append(w_option('NUM_THREADS', 'ALL_CPUS'))
+
+
 
         # generate cut line
         if self.options.cut or self.options.cutline:
@@ -796,7 +799,10 @@ class Pyramid(object):
 
         #~ ld('proc_tile', tile, tile_img, opacity)
         if tile_img is not None and opacity != 0:
+          
+
             self.write_tile(tile, tile_img)
+
 
             # write tile-level metadata (html/kml)
             self.write_metadata(tile, [ch for img, ch, opacities in ch_results])
@@ -853,7 +859,7 @@ class Pyramid(object):
 
     def map_tiles2longlat_bounds(self, tiles):
         'translate "logical" tiles to latlong boxes'
-    #----------------------------
+    #----------------------------print
         # via 'logical' to 'physical' tile mapping
         return self.bounds_lst2longlat([self.tile_bounds(self.tile_map[t]) for t in tiles])
 
