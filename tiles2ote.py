@@ -91,7 +91,9 @@ class TileBorderCore:
 
         return data
 
-    def getToKnowTheNeighbours(self,input_grid_copy, neighbourValues):
+    def getToKnowTheNeighbours(self,input_grid_copy, band3, neighbourValues):
+
+        # numpy matrix: [row index, column index], : = all values
 
         # list has to be flattened to fit into stempel_data column
         def flatten(*args):
@@ -102,7 +104,27 @@ class TileBorderCore:
                 else:
                     yield x
 
-        # numpy matrix: [row index, column index], : = all values
+        
+        # encode neighbor values into last eight rows of blue channel
+
+        # N row 256
+        band3[255,:] = neighbourValues[0] 
+        # S row 255
+        band3[254,:] = neighbourValues[1]
+        # E row 254
+        band3[253,:] = list(flatten(neighbourValues[2])) 
+        # W row 253
+        band3[252,:] = list(flatten(neighbourValues[3]))
+
+        # N row 252
+        band3[251,:] = neighbourValues[0] 
+        # S row 251
+        band3[250,:] = neighbourValues[1]
+        # E row 250
+        band3[249,:] = list(flatten(neighbourValues[2])) 
+        # W row 249
+        band3[248,:] = list(flatten(neighbourValues[3]))
+
 
         ##### STORE VALUES OF ADJACENT CORNERS IN NW NE SE SW
         self.nwCorner = input_grid_copy[0,0]
@@ -139,6 +161,7 @@ class TileBorderCore:
         
         self.out_band_1_2 = self.driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 1, gdal.GDT_Int16)
         self.out_band_3 = self.driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 1, gdal.GDT_Int16)
+        band3 = self.out_band_3.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize)
 
         # create matrix of input grid
         input_grid = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize)
@@ -147,13 +170,13 @@ class TileBorderCore:
         input_grid_copy = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize) 
         
         # prepare stempel
-        self.getToKnowTheNeighbours(input_grid_copy, in_neighbourValues) 
+        self.getToKnowTheNeighbours(input_grid_copy, band3, in_neighbourValues) 
 
         # computing mean of original raster grid and stempel for averaged border values
         input_grid=np.divide(np.add(input_grid,input_grid_copy),2.0)
 
         self.out_band_1_2.GetRasterBand(1).WriteArray(input_grid)
-        self.out_band_3.GetRasterBand(1).WriteArray(input_grid_copy)
+        self.out_band_3.GetRasterBand(1).WriteArray(band3)
 
         # create output image as temporary MEM Buffer with same size as input
         self.out_ds = self.driver.Create('', self.in_ds.RasterXSize, self.in_ds.RasterYSize, 4)
@@ -183,14 +206,22 @@ class TileBorderCore:
                 self.out_ds.GetRasterBand(2).WriteArray(np.bitwise_and(np.right_shift(data_1, 8), 0xff), j, i)                  
 
 
-                # read data
-                data_2 = self.out_band_3.ReadAsArray(j, i, cols, rows)
-                # add 11000 to avoid negative numbers             
-                data_2 = np.add(data_2, 11000)
-
                 # encode adjacent tile border values for computation of shading in b channel                
-                self.out_ds.GetRasterBand(3).WriteArray(np.bitwise_and(data_2, 0xff), j, i)               
-                #self.out_ds.GetRasterBand(3).WriteArray(np.bitwise_and(np.right_shift(data_2, 8), 0xff), j, i)
+                if(i == 240):
+                    u = 248
+                    # read data
+                    data_2 = self.out_band_3.ReadAsArray(j, u, cols, 4)
+                    # add 11000 to avoid negative numbers             
+                    data_2 = np.add(data_2, 11000)
+                    self.out_ds.GetRasterBand(3).WriteArray(np.bitwise_and(data_2, 0xff), j, u)      
+                if(i == 248):
+                    u = 252
+                    # read data
+                    data_2 = self.out_band_3.ReadAsArray(j, u, cols, 4)
+                    # add 11000 to avoid negative numbers             
+                    data_2 = np.add(data_2, 11000)
+                    self.out_ds.GetRasterBand(3).WriteArray(np.bitwise_and(np.right_shift(data_2, 8), 0xff), j, u)
+
 
                 # fill a channel with 255. the a channel cant have a different value because of 
                 # http://stackoverflow.com/questions/23497925/how-can-i-stop-the-alpha-premultiplication-with-canvas-imagedata
