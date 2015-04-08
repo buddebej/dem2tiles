@@ -91,7 +91,7 @@ class TileBorderCore:
 
         return data
 
-    def getToKnowTheNeighbours(self,input_grid_copy, band3, neighbourValues):
+    def copyEdges(self, input_grid_copy, neighbourValues, band3):
 
         # numpy matrix: [row index, column index], : = all values
 
@@ -104,6 +104,11 @@ class TileBorderCore:
                 else:
                     yield x
 
+        ##### STORE VALUES OF ADJACENT CORNERS IN NW NE SE SW
+        self.nwCorner = int(input_grid_copy[0,0])
+        self.neCorner = int(input_grid_copy[0,255])
+        self.seCorner = int(input_grid_copy[255,255])
+        self.swCorner = int(input_grid_copy[255,0])
         
         # encode neighbor values into last eight rows of blue channel
 
@@ -124,14 +129,8 @@ class TileBorderCore:
         band3[249,:] = list(flatten(neighbourValues[2])) 
         # W row 249
         band3[248,:] = list(flatten(neighbourValues[3]))
-
-
-        ##### STORE VALUES OF ADJACENT CORNERS IN NW NE SE SW
-        self.nwCorner = input_grid_copy[0,0]
-        self.neCorner = input_grid_copy[0,255]
-        self.seCorner = input_grid_copy[255,255]
-        self.swCorner = input_grid_copy[255,0]     
-        
+     
+       
         ##### COPY ADJACENT ROWS TO INPUT GRID
         # N
         input_grid_copy[0,:] = neighbourValues[0] 
@@ -141,9 +140,13 @@ class TileBorderCore:
         input_grid_copy[:,255] = list(flatten(neighbourValues[2])) # list has to be flattened to fit into stempel_data column
         # W
         input_grid_copy[:,0] = list(flatten(neighbourValues[3])) # list has to be flattened to fit into stempel_data column
+    
+
+    def copyCorners(self, input_grid_copy, neighbourValues):
 
         ##### COMPUTE CORNER VALUES WITH ALL ADJACENT PIXEL VALUES
         # is NW Corner Neighbour available ?
+      
         if(neighbourValues[4] != -1):
             # NW
             input_grid_copy[0,0] = (neighbourValues[4][0][0] + neighbourValues[0][0][0] +  neighbourValues[3][0][0] + self.nwCorner) / 4.0  
@@ -170,10 +173,12 @@ class TileBorderCore:
         input_grid_copy = self.in_band_1.ReadAsArray(0, 0, self.in_ds.RasterXSize, self.in_ds.RasterYSize) 
         
         # prepare stempel
-        self.getToKnowTheNeighbours(input_grid_copy, band3, in_neighbourValues) 
+        self.copyEdges(input_grid_copy, in_neighbourValues, band3) 
 
         # computing mean of original raster grid and stempel for averaged border values
         input_grid=np.divide(np.add(input_grid,input_grid_copy),2.0)
+
+        self.copyCorners(input_grid, in_neighbourValues) 
 
         self.out_band_1_2.GetRasterBand(1).WriteArray(input_grid)
         self.out_band_3.GetRasterBand(1).WriteArray(band3)
